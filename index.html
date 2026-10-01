@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#0F6E56"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="NSGRx Capture"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>NSGRx Capture</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8f9fb;color:#1a202c;min-height:100vh;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);}
+input,textarea,select,button{font-family:inherit;}
+.header{background:#0F6E56;color:#fff;padding:16px 20px;position:sticky;top:0;z-index:10;}
+.header h1{font-size:18px;font-weight:600;}
+.header .sub{font-size:12px;opacity:0.85;margin-top:2px;}
+.container{max-width:600px;margin:0 auto;padding:16px;}
+.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+.btn{padding:12px 18px;border-radius:9px;border:none;font-size:15px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;}
+.btn-primary{background:#0F6E56;color:#fff;width:100%;}
+.btn-ghost{background:#f1f4f8;color:#4a5568;}
+.btn-danger{background:#fef2f2;color:#dc2626;}
+.btn-sync{background:#eff4ff;color:#2563eb;flex:1;}
+.btn:disabled{opacity:0.5;cursor:default;}
+.mic-btn{width:60px;height:60px;border-radius:30px;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.hint{font-size:11px;color:#a0aec0;margin-top:10px;line-height:1.5;}
+textarea{width:100%;min-height:70px;border:1px solid #c4cdd9;border-radius:8px;padding:10px;font-size:14px;resize:vertical;outline:none;}
+input[type=text]{width:100%;border:1px solid #c4cdd9;border-radius:8px;padding:10px;font-size:14px;outline:none;margin-bottom:10px;}
+.thumb{width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin-bottom:10px;display:block;}
+.queueItem{background:#fff;border-radius:10px;padding:12px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06);}
+.queueItem img{width:60px;height:60px;object-fit:cover;border-radius:7px;flex-shrink:0;}
+.row{display:flex;gap:10px;}
+.badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;text-transform:uppercase;}
+.badge-pending{background:#fffbeb;color:#d97706;}
+.badge-synced{background:#ecfdf5;color:#059669;}
+.badge-error{background:#fef2f2;color:#dc2626;}
+.empty{text-align:center;padding:40px 20px;color:#a0aec0;font-size:13px;}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a202c;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:100;max-width:90%;text-align:center;}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>NSGRx Capture</h1>
+  <div class="sub" id="connStatus">Checking connection...</div>
+</div>
+
+<div class="container">
+
+  <div class="card" id="captureCard">
+    <div style="font-size:13px;font-weight:700;color:#718096;text-transform:uppercase;margin-bottom:10px;">New capture</div>
+
+    <div id="photoPreviewWrap" style="display:none;">
+      <img id="photoPreview" class="thumb"/>
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*" capture="environment" style="display:none;"/>
+    <button class="btn btn-primary" id="photoBtn" style="margin-bottom:10px;">Take photo</button>
+
+    <div class="row" style="align-items:center;margin-bottom:10px;">
+      <textarea id="noteText" placeholder="Note (tap mic to dictate, or type)"></textarea>
+      <button class="mic-btn" id="micBtn" style="background:#eff4ff;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" id="micIcon">
+          <rect x="9" y="2" width="6" height="12" rx="3" fill="#2563eb"/>
+          <path d="M5 11a7 7 0 0 0 14 0" stroke="#2563eb" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <line x1="12" y1="18" x2="12" y2="22" stroke="#2563eb" stroke-width="2" stroke-linecap="round"/>
+          <line x1="8" y1="22" x2="16" y2="22" stroke="#2563eb" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <input type="text" id="patientHint" placeholder="Patient name or MRN (if known)"/>
+
+    <button class="btn btn-primary" id="saveBtn" style="background:#059669;">Save to queue</button>
+    <div class="hint">Saved locally on this device immediately. Nothing is sent anywhere until you sync below.</div>
+  </div>
+
+  <div class="card">
+    <div style="font-size:13px;font-weight:700;color:#718096;text-transform:uppercase;margin-bottom:10px;">Sync</div>
+    <div class="row">
+      <button class="btn btn-sync" id="syncTailscale">Sync via Tailscale</button>
+      <button class="btn btn-sync" id="syncHome">Sync via home network</button>
+    </div>
+    <div class="hint">Tries to reach your NeuroSurgRx server. Nothing happens to items already synced.</div>
+  </div>
+
+  <div id="queueList"></div>
+
+</div>
+
+<script>
+const SERVER_TAILSCALE = 'https://REPLACE-WITH-TAILSCALE-ADDR:3000';
+const SERVER_HOME = 'http://REPLACE-WITH-HOME-IP:3000';
+
+let db;
+let currentPhoto = null;
+
+function openDb(){
+  return new Promise((resolve,reject)=>{
+    const req = indexedDB.open('nsgrx-capture', 1);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if(!d.objectStoreNames.contains('captures')){
+        d.createObjectStore('captures', {keyPath:'id'});
+      }
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = e => reject(e);
+  });
+}
+
+function addCapture(item){
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction('captures','readwrite');
+    tx.objectStore('captures').put(item);
+    tx.oncomplete = () => resolve();
+    tx.onerror = e => reject(e);
+  });
+}
+
+function getAllCaptures(){
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction('captures','readonly');
+    const req = tx.objectStore('captures').getAll();
+    req.onsuccess = () => resolve(req.result.sort((a,b)=>b.createdAt.localeCompare(a.createdAt)));
+    req.onerror = e => reject(e);
+  });
+}
+
+function deleteCapture(id){
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction('captures','readwrite');
+    tx.objectStore('captures').delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = e => reject(e);
+  });
+}
+
+function showToast(msg){
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2600);
+}
+
+function fileToDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+document.getElementById('photoBtn').addEventListener('click', ()=>{
+  document.getElementById('fileInput').click();
+});
+
+document.getElementById('fileInput').addEventListener('change', async e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  currentPhoto = await fileToDataUrl(file);
+  document.getElementById('photoPreview').src = currentPhoto;
+  document.getElementById('photoPreviewWrap').style.display = 'block';
+});
+
+let listening = false;
+let recognition = null;
+document.getElementById('micBtn').addEventListener('click', ()=>{
+  const micBtn = document.getElementById('micBtn');
+  if(listening){
+    if(recognition) recognition.stop();
+    listening = false;
+    micBtn.style.background = '#eff4ff';
+    return;
+  }
+  if(!window.isSecureContext){
+    showToast('Voice input needs a secure (https) connection');
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    showToast('Voice input not supported in this browser');
+    return;
+  }
+  recognition = new SR();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = 'en-US';
+  recognition.onresult = e => {
+    const transcript = e.results[0][0].transcript;
+    const ta = document.getElementById('noteText');
+    ta.value = ta.value ? ta.value.trim() + ' ' + transcript : transcript;
+  };
+  recognition.onerror = () => { listening = false; micBtn.style.background = '#eff4ff'; };
+  recognition.onend = () => { listening = false; micBtn.style.background = '#eff4ff'; };
+  try{
+    recognition.start();
+    listening = true;
+    micBtn.style.background = '#ecfdf5';
+  }catch(e){ listening = false; }
+});
+
+document.getElementById('saveBtn').addEventListener('click', async ()=>{
+  const note = document.getElementById('noteText').value.trim();
+  const hint = document.getElementById('patientHint').value.trim();
+  if(!currentPhoto && !note){
+    showToast('Add a photo or a note first');
+    return;
+  }
+  const item = {
+    id: 'cap_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+    photo: currentPhoto,
+    note: note,
+    patientHint: hint,
+    createdAt: new Date().toISOString(),
+    synced: false,
+    syncError: null
+  };
+  await addCapture(item);
+  currentPhoto = null;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('photoPreviewWrap').style.display = 'none';
+  document.getElementById('noteText').value = '';
+  document.getElementById('patientHint').value = '';
+  showToast('Saved to queue');
+  renderQueue();
+});
+
+async function renderQueue(){
+  const items = await getAllCaptures();
+  const wrap = document.getElementById('queueList');
+  if(items.length === 0){
+    wrap.innerHTML = '<div class="empty">No captures yet. Take a photo or record a note above.</div>';
+    return;
+  }
+  wrap.innerHTML = '';
+  const header = document.createElement('div');
+  header.style.cssText = 'font-size:13px;font-weight:700;color:#718096;text-transform:uppercase;margin:4px 0 10px;';
+  header.textContent = items.length + ' item(s) in queue';
+  wrap.appendChild(header);
+
+  items.forEach(item=>{
+    const el = document.createElement('div');
+    el.className = 'queueItem';
+    const badge = item.synced ? '<span class="badge badge-synced">Synced</span>' : (item.syncError ? '<span class="badge badge-error">Error</span>' : '<span class="badge badge-pending">Pending</span>');
+    el.innerHTML = `
+      <div class="row" style="align-items:flex-start;">
+        ${item.photo ? `<img src="${item.photo}"/>` : ''}
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="font-size:11px;color:#a0aec0;">${new Date(item.createdAt).toLocaleString()}</span>
+            ${badge}
+          </div>
+          ${item.patientHint ? `<div style="font-size:13px;font-weight:600;margin-bottom:2px;">${item.patientHint}</div>` : ''}
+          <div style="font-size:13px;color:#4a5568;">${item.note || '(no note)'}</div>
+          ${item.syncError ? `<div style="font-size:11px;color:#dc2626;margin-top:4px;">${item.syncError}</div>` : ''}
+        </div>
+      </div>
+      <div style="margin-top:8px;text-align:right;">
+        <button class="btn btn-danger" data-del="${item.id}" style="padding:5px 12px;font-size:12px;">Delete</button>
+      </div>
+    `;
+    wrap.appendChild(el);
+  });
+
+  wrap.querySelectorAll('[data-del]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(confirm('Delete this capture?')){
+        await deleteCapture(btn.getAttribute('data-del'));
+        renderQueue();
+      }
+    });
+  });
+}
+
+async function syncTo(baseUrl, label){
+  const items = (await getAllCaptures()).filter(i=>!i.synced);
+  if(items.length === 0){
+    showToast('Nothing to sync');
+    return;
+  }
+  showToast('Syncing ' + items.length + ' item(s) via ' + label + '...');
+  let okCount = 0, failCount = 0;
+  for(const item of items){
+    try{
+      const resp = await fetch(baseUrl + '/api/captures', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          photo: item.photo,
+          note: item.note,
+          patientHint: item.patientHint,
+          createdAt: item.createdAt
+        })
+      });
+      if(!resp.ok) throw new Error('Server responded ' + resp.status);
+      item.synced = true;
+      item.syncError = null;
+      await addCapture(item);
+      okCount++;
+    }catch(e){
+      item.syncError = 'Could not reach server via ' + label;
+      await addCapture(item);
+      failCount++;
+    }
+  }
+  showToast(okCount + ' synced' + (failCount ? ', ' + failCount + ' failed' : ''));
+  renderQueue();
+}
+
+document.getElementById('syncTailscale').addEventListener('click', ()=>syncTo(SERVER_TAILSCALE, 'Tailscale'));
+document.getElementById('syncHome').addEventListener('click', ()=>syncTo(SERVER_HOME, 'home network'));
+
+async function checkConnection(){
+  const status = document.getElementById('connStatus');
+  try{
+    const resp = await fetch(SERVER_TAILSCALE + '/api/ping', {method:'GET', mode:'cors'});
+    if(resp.ok){ status.textContent = 'Connected to server (Tailscale)'; return; }
+  }catch(e){}
+  try{
+    const resp = await fetch(SERVER_HOME + '/api/ping', {method:'GET', mode:'cors'});
+    if(resp.ok){ status.textContent = 'Connected to server (home network)'; return; }
+  }catch(e){}
+  status.textContent = 'Server not reachable right now - captures will queue';
+}
+
+(async function init(){
+  db = await openDb();
+  renderQueue();
+  checkConnection();
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
+})();
+</script>
+</body>
+</html>
