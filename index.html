@@ -42,7 +42,7 @@ input[type=text]{width:100%;border:1px solid #c4cdd9;border-radius:8px;padding:1
 </style>
 </head>
 <body>
-<div class="header">
+<div class="header" id="headerBar">
   <h1>NSGRx Capture</h1>
   <div class="sub" id="connStatus">Checking connection...</div>
 </div>
@@ -317,21 +317,24 @@ document.getElementById('syncHome').addEventListener('click', ()=>syncTo(SERVER_
 
 async function checkConnection(){
   const status = document.getElementById('connStatus');
+  const header = document.getElementById('headerBar');
   try{
     const resp = await fetch(SERVER_TAILSCALE + '/api/ping', {method:'GET', mode:'cors'});
-    if(resp.ok){ status.textContent = 'Connected to server (Tailscale)'; return; }
+    if(resp.ok){ status.textContent = 'Connected to server (Tailscale)'; header.style.background = '#0F6E56'; return; }
   }catch(e){}
   try{
     const resp = await fetch(SERVER_HOME + '/api/ping', {method:'GET', mode:'cors'});
-    if(resp.ok){ status.textContent = 'Connected to server (home network)'; return; }
+    if(resp.ok){ status.textContent = 'Connected to server (home network)'; header.style.background = '#0F6E56'; return; }
   }catch(e){}
   status.textContent = 'Server not reachable right now - captures will queue';
+  header.style.background = '#b45309';
 }
 
 (async function init(){
   db = await openDb();
   renderQueue();
   checkConnection();
+  setInterval(checkConnection, 10000);
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   }
